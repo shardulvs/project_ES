@@ -1,54 +1,66 @@
-# Secure Door Lock - STM32F429I-DISC1 (Keil uVision)
+# Secure Door Lock - STM32F429I-DISC1 (Keil uVision, **no HAL**)
+
+This version uses **only CMSIS and direct register access**. You do **not** need
+to install STM32Cube HAL. This is the smallest possible setup.
 
 ## Files
 
 ```
 Inc/
-  debug.h       lcd_i2c.h    keypad.h    rc522.h    storage.h
+  bsp.h       debug.h    lcd_i2c.h   keypad.h   rc522.h   storage.h
 Src/
-  main.c        debug.c      lcd_i2c.c   keypad.c   rc522.c   storage.c
+  main.c      bsp.c      debug.c     lcd_i2c.c  keypad.c  rc522.c  storage.c
 ```
 
-## Creating the Keil project (quickest path)
+## Keil uVision setup (minimal)
 
-1. **File → New → uVision Project...**, pick device **STM32F429ZITx** (Discovery has ZI).
-2. In the Manage Run-Time Environment dialog, tick:
-   - **CMSIS → CORE**
-   - **Device → Startup**
-   - **Device → STM32Cube Framework (API) → Classic** (or use the HAL driver pack)
-   - **Device → STM32Cube HAL → Common, Cortex, GPIO, SPI, I2C, RCC, PWR**
-3. Add all files from `Src/` to the project's Source Group.
-4. Project → Options → C/C++ → Include Paths: add the `Inc/` directory and the Keil HAL include paths (they're added automatically if you used the RTE).
-5. Project → Options → C/C++ → Define: add `STM32F429xx` and `USE_HAL_DRIVER`.
-6. Project → Options → Target → **MicroLIB** should be ticked (so `printf` is small).
-7. Build (F7). Flash (F8).
+1. **File -> New -> uVision Project...** -> pick **STMicroelectronics / STM32F429 / STM32F429ZI / STM32F429ZITx** (DISC1 has ZI).
+2. In the *Manage Run-Time Environment* dialog, tick **only**:
+   - **CMSIS -> CORE**
+   - **Device -> Startup**
 
-If you prefer CubeMX: generate a Keil project targeting STM32F429ZI-Discovery with clock set to 180 MHz (HSE 8 MHz, PLL/M=8, N=360, P=2), enable SPI1 (master, 8-bit, CPOL=Low CPHA=1Edge, prescaler 32), I2C1 at 100 kHz, then copy our `Src/*.c` and `Inc/*.h` in and overwrite the generated `main.c`.
+   That's it. Nothing else. Click **Resolve**, then **OK**. uVision drops a `system_stm32f4xx.c` and a `startup_stm32f429xx.s` into the project automatically.
+3. In the project tree, add both `Inc/` and `Src/` folders. Right-click *Source Group 1* -> **Add Existing Files to Group** -> select every `.c` inside `Src/`.
+4. **Project -> Options for Target** (Alt+F7):
+   - Tab **C/C++ (AC6)** -> **Include Paths**: click `...` -> **New (Insert)** -> browse to your `Inc/` folder. OK.
+   - Tab **C/C++ (AC6)** -> **Define**: add `STM32F429xx` (no spaces).
+   - Tab **Target** -> tick **Use MicroLIB**.
+5. **Build** (F7). Should finish with 0 errors.
+6. **Flash** (F8).
 
-## Enabling SWO (printf) in Keil
+## Enabling `printf` over SWO (debug prints)
 
-Our `debug.c` sends `printf` to ITM port 0 over SWO.
+The macros `DBG(...)` and `DBGE(...)` send text over ITM stimulus port 0, which the ST-Link carries out on the SWO pin.
 
-- Project → Options → Debug → pick **ST-Link Debugger**, click **Settings**.
-- Tab **Trace**: tick *Enable*, Core Clock = **180 MHz**, Port 0 → *ITM Stimulus Ports* box `0x00000001`.
-- Start debug session. **View → Serial Windows → Debug (printf) Viewer**.
+- **Project -> Options -> Debug** -> choose **ST-Link Debugger** (right radio), click **Settings**.
+- Tab **Trace**:
+  - Tick **Enable**.
+  - **Core Clock:** `16.000000 MHz` (we run on default HSI; no PLL is set up).
+  - **Trace Port:** *Serial Wire Output - Manchester* (or *UART*, either works).
+  - In *ITM Stimulus Ports*, make sure **Port 0** is ticked (the dropdown / bit-0 enable).
+- Start debugging (Ctrl+F5). Open **View -> Serial Windows -> Debug (printf) Viewer**. You should see the boot banner immediately.
 
-If SWO does not work on your board (some DISC1 revisions route PB3 oddly), swap `ITM_SendChar` in `debug.c` for a UART TX call (e.g. USART1 on PA9/PA10 via a USB-TTL adapter).
+If SWO doesn't work for you, you can disable prints quickly by editing `Inc/debug.h`:
 
-## Pin map (recap)
+```c
+#define DBG(fmt, ...)   ((void)0)
+#define DBGE(fmt, ...)  ((void)0)
+```
 
-| Peripheral | Pin(s) |
+## Pin map
+
+| Peripheral    | Pin(s) |
 |---|---|
-| SPI1 / RC522  | PA3=RST  PA4=SS  PA5=SCK  PA6=MISO  PA7=MOSI |
-| I2C1 / LCD    | PB8=SCL  PB9=SDA  (5V power, level shifts via pull-ups) |
+| SPI1 / RC522  | PA3=RST, PA4=SS, PA5=SCK, PA6=MISO, PA7=MOSI |
+| I2C1 / LCD    | PB8=SCL, PB9=SDA (5 V LCD, 3.3 V I2C is fine) |
 | Keypad rows   | PB0, PB1, PB2, PB10 (output) |
-| Keypad cols   | PB12..PB15 (input pull-up) |
+| Keypad cols   | PB12..PB15 (input, internal pull-up) |
 | Buzzer        | PC6 |
-| Green LED     | PC0 |
-| Red LED       | PD0 |
-| Tamper btn    | PA0 (to GND; internal pull-up, EXTI falling) |
+| Green LED     | PC0 (through 220 ohm to GND) |
+| Red LED       | PD0 (through 220 ohm to GND) |
+| Tamper button | PA0 to GND (internal pull-up, EXTI falling edge) |
 
-Note: only one green + one red LED are used in firmware. If you want all five of each wired, connect them in parallel through their own resistors to the same GPIO. The design docs mention multiple LEDs but one GPIO per color is sufficient.
+Only one green + one red LED are driven. To light multiple LEDs per color, wire them in parallel, each with its own 220 ohm series resistor, to the same GPIO.
 
 ## Keypad layout assumed
 
@@ -59,43 +71,46 @@ Note: only one green + one red LED are used in firmware. If you want all five of
 * 0 # D
 ```
 
-In PIN entry:
-- digits 0-9 enter the PIN (masked as `*`)
-- `#` submits
-- `*` is backspace
-- `D` cancels
+**PIN entry:** digits enter the PIN (masked as `*`), `#` submits, `*` is backspace, `D` cancels.
 
-At idle:
-- Tap `A` → master-PIN only entry path
-- Hold `#` for 2 s → admin entry (requires master PIN)
+**At idle:**
+- Tap `A` -> master-PIN-only emergency entry path.
+- Hold `#` for 2 s -> admin mode (requires master PIN to enter).
 
-Admin menu keys: `A`=enroll card, `B`=delete card, `C`=change master PIN, `D`=exit.
+**In admin menu:** `A`=enroll, `B`=delete, `C`=change master PIN, `D`=exit.
 
-## Defaults (see `Src/storage.c`)
+## Defaults (in `Src/storage.c`)
 
 - Master PIN: `9999`
-- Duress PIN: `0000` (grants entry, silently flags an alarm - change for real use)
-- Per-card PIN: `1234` (set on enroll; edit `storage.c` to customise)
-- One demo card with UID `DE AD BE EF` is pre-enrolled for testing the flow before you scan a real card.
+- Duress PIN: `0000` (appears to unlock but flags a silent alarm)
+- Per-card PIN (set on enrollment): `1234`
+- One demo card `DE AD BE EF` is pre-enrolled so you can test the flow before you scan a real card.
 
-## LCD I²C address
+## LCD I2C address
 
-Most PCF8574 backpacks are at `0x27`; some are `0x3F`. If the screen is blank after boot:
-1. Watch the debug printout - we probe the address on init.
-2. If not found, change `LCD_I2C_ADDR` in `Inc/lcd_i2c.h`.
+Typical PCF8574 backpack is at `0x27`; some are `0x3F`. On boot, the debug log tells you whether ACK was received. If not, edit `#define LCD_I2C_ADDR 0x27` in `Inc/lcd_i2c.h` to `0x3F`.
 
 ## Flow summary
 
-1. Idle: red LED on, LCD shows "Scan card...".
-2. Scan known card → LCD prompts for PIN → enter 4 digits + `#`.
-3. Correct PIN ⇒ green LED + 2-tone beep + 5 s unlock window with countdown.
-4. Wrong PIN / unknown card / bad master ⇒ red blink + low tone; 3 fails in a row ⇒ 30 s lockout with on-screen countdown + rapid beep.
-5. Tamper button press at any time ⇒ 8-second audible alarm.
-6. Duress PIN ⇒ grants access but logs a silent alarm (for real deployment route this to a radio / GSM module).
+1. Idle: red LED on, LCD shows "Scan card..."
+2. Scan known card -> LCD prompts PIN -> enter 4 digits + `#`.
+3. Correct PIN -> green LED, 2-tone beep, 5-second unlock with on-screen countdown.
+4. Wrong PIN / unknown card / bad master -> red blink + low tone; 3 wrong tries in a row -> 30-second lockout countdown + rapid beeping.
+5. Tamper button press at any time -> 8-second audible alarm.
+6. Duress PIN -> grants access silently while logging an alarm (route this to a radio/GSM in a real build).
 
-## Things to change for a "real" product
+## Troubleshooting
 
-- Persist `Config` into internal flash (sector 11 is a good candidate on F429) so enrolments survive a reboot.
-- Drive the solenoid/relay with the green LED pin (or a dedicated pin) through a transistor + flyback diode.
-- Add a reed switch so "door left open" can be detected and trigger an auto-alarm.
-- Replace the buzzer beep timing loops with a hardware timer so they don't block the state machine during long events.
+| Symptom | Likely cause |
+|---|---|
+| LCD stays blank | Wrong I2C address (try `0x3F`), missing external 4.7 k pull-ups on SDA/SCL, 5 V vs 3.3 V mismatch on VCC. |
+| `RC522 Version: 0x00` or `0xFF` | SPI wiring off, RST not pulsed, RC522 not powered at 3.3 V. Make sure MOSI/MISO aren't swapped. |
+| Keypad reads ghost keys | Rows/cols swapped, cols missing pull-ups (we enable internal ones; a 10 k external is OK). |
+| Tamper alarm triggers on boot | PA0 floating (make sure the button actually pulls to GND) or noisy wire; add a 100 nF debounce cap. |
+| No printf output | SWO not enabled in Keil Trace settings, or Core Clock is wrong (must be 16 MHz unless you add a PLL setup). |
+
+## What's intentionally *not* included
+
+- Persistent storage (flash). Enrollments vanish on reset. For a real build, write `g_cfg` to an internal-flash sector.
+- Hardware timer for buzzer patterns (we use blocking delays).
+- A relay/solenoid driver. Drive one from the green LED pin through a transistor + flyback diode.

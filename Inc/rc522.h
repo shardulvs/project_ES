@@ -1,7 +1,9 @@
 #ifndef RC522_H
 #define RC522_H
 
-#include "stm32f4xx_hal.h"
+#include <stdint.h>
+
+/* Wiring: PA3=RST, PA4=SS (NSS), SPI1 on PA5/6/7 */
 
 /* MFRC522 Register map (subset) */
 #define MFRC522_REG_COMMAND        0x01
@@ -27,7 +29,7 @@
 #define MFRC522_REG_T_RELOAD_L     0x2D
 #define MFRC522_REG_VERSION        0x37
 
-/* MFRC522 Commands */
+/* Commands */
 #define MFRC522_CMD_IDLE           0x00
 #define MFRC522_CMD_CALC_CRC       0x03
 #define MFRC522_CMD_TRANSCEIVE     0x0C
@@ -38,18 +40,17 @@
 #define PICC_ANTICOLL              0x93
 #define PICC_HALT                  0x50
 
-#define MI_OK      0
+#define MI_OK       0
 #define MI_NOTAGERR 1
-#define MI_ERR     2
+#define MI_ERR      2
 
-#define RC522_UID_LEN 5  /* 4 bytes + BCC */
+#define RC522_UID_LEN 5
 
-void RC522_Init(SPI_HandleTypeDef *hspi, GPIO_TypeDef *ss_port, uint16_t ss_pin,
-                GPIO_TypeDef *rst_port, uint16_t rst_pin);
+void    RC522_Init(void);
 uint8_t RC522_Version(void);
 uint8_t RC522_Request(uint8_t req_mode, uint8_t *tag_type);
-uint8_t RC522_Anticoll(uint8_t *serial);   /* 5 bytes (4 UID + BCC) */
+uint8_t RC522_Anticoll(uint8_t *serial);
 void    RC522_Halt(void);
-uint8_t RC522_ReadUID(uint8_t *uid);        /* returns 1 if UID read, 0 otherwise */
+uint8_t RC522_ReadUID(uint8_t *uid);   /* returns 1 if UID present */
 
 #endif

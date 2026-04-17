@@ -1,17 +1,11 @@
 #include "debug.h"
+#include "stm32f4xx.h"
 
-/* Keil MicroLIB retarget: fputc sends chars to ITM port 0 (SWO) */
-void debug_init(void) { /* ITM is set up by the debugger automatically */ }
+void debug_init(void) { /* ITM is enabled by the debugger */ }
 
-#ifdef __GNUC__
-int _write(int file, char *ptr, int len) {
-    for (int i = 0; i < len; i++) ITM_SendChar(ptr[i]);
-    return len;
-}
-#else
+/* Retarget printf to ITM Stimulus Port 0 (SWO) - requires MicroLIB */
 int fputc(int ch, FILE *f) {
     (void)f;
-    ITM_SendChar(ch);
+    ITM_SendChar((uint32_t)ch);
     return ch;
 }
-#endif

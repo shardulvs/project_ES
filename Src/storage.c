@@ -1,5 +1,6 @@
 #include "storage.h"
 #include "debug.h"
+#include "bsp.h"
 #include <string.h>
 
 /* For simplicity the config lives in RAM. To persist across resets, port this

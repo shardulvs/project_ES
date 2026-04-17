@@ -1,7 +1,7 @@
 #ifndef STORAGE_H
 #define STORAGE_H
 
-#include "stm32f4xx_hal.h"
+#include <stdint.h>
 
 #define MAX_CARDS       8
 #define PIN_LEN         4

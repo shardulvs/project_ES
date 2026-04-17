@@ -1,72 +1,65 @@
 #include "rc522.h"
+#include "bsp.h"
 #include "debug.h"
 
-static SPI_HandleTypeDef *rc_hspi;
-static GPIO_TypeDef *rc_ss_port, *rc_rst_port;
-static uint16_t      rc_ss_pin,  rc_rst_pin;
-
-static inline void CS_LOW(void)  { HAL_GPIO_WritePin(rc_ss_port, rc_ss_pin, GPIO_PIN_RESET); }
-static inline void CS_HIGH(void) { HAL_GPIO_WritePin(rc_ss_port, rc_ss_pin, GPIO_PIN_SET);   }
+/* NSS = PA4, RST = PA3 (controlled as GPIOs; SPI is software NSS) */
+#define SS_LOW()   gpio_write(GPIOA, 4, 0)
+#define SS_HIGH()  gpio_write(GPIOA, 4, 1)
+#define RST_LOW()  gpio_write(GPIOA, 3, 0)
+#define RST_HIGH() gpio_write(GPIOA, 3, 1)
 
 static void rc_write(uint8_t reg, uint8_t val) {
-    uint8_t tx[2] = { (reg << 1) & 0x7E, val };
-    CS_LOW();
-    HAL_SPI_Transmit(rc_hspi, tx, 2, 100);
-    CS_HIGH();
+    SS_LOW();
+    spi1_txrx((reg << 1) & 0x7E);
+    spi1_txrx(val);
+    SS_HIGH();
 }
 
 static uint8_t rc_read(uint8_t reg) {
-    uint8_t tx = ((reg << 1) & 0x7E) | 0x80;
-    uint8_t rx = 0, zero = 0;
-    CS_LOW();
-    HAL_SPI_Transmit(rc_hspi, &tx, 1, 100);
-    HAL_SPI_TransmitReceive(rc_hspi, &zero, &rx, 1, 100);
-    CS_HIGH();
-    return rx;
+    SS_LOW();
+    spi1_txrx(((reg << 1) & 0x7E) | 0x80);
+    uint8_t v = spi1_txrx(0x00);
+    SS_HIGH();
+    return v;
 }
 
-static void rc_set_bit(uint8_t reg, uint8_t mask) { rc_write(reg, rc_read(reg) | mask); }
-static void rc_clr_bit(uint8_t reg, uint8_t mask) { rc_write(reg, rc_read(reg) & ~mask); }
+static void rc_set_bit(uint8_t reg, uint8_t m) { rc_write(reg, rc_read(reg) |  m); }
+static void rc_clr_bit(uint8_t reg, uint8_t m) { rc_write(reg, rc_read(reg) & ~m); }
 
 static void rc_antenna_on(void) {
     if (!(rc_read(MFRC522_REG_TX_CONTROL) & 0x03))
         rc_set_bit(MFRC522_REG_TX_CONTROL, 0x03);
 }
 
-static void rc_reset(void) {
-    HAL_GPIO_WritePin(rc_rst_port, rc_rst_pin, GPIO_PIN_RESET);
-    HAL_Delay(5);
-    HAL_GPIO_WritePin(rc_rst_port, rc_rst_pin, GPIO_PIN_SET);
-    HAL_Delay(50);
+void RC522_Init(void) {
+    /* PA3 (RST) and PA4 (NSS) as push-pull outputs, idle HIGH */
+    gpio_clk_enable(GPIOA);
+    gpio_mode (GPIOA, 3, 1); gpio_otype(GPIOA, 3, 0); gpio_speed(GPIOA, 3, 2); gpio_write(GPIOA, 3, 1);
+    gpio_mode (GPIOA, 4, 1); gpio_otype(GPIOA, 4, 0); gpio_speed(GPIOA, 4, 2); gpio_write(GPIOA, 4, 1);
+
+    /* Hardware reset pulse */
+    RST_LOW();  delay_ms(5);
+    RST_HIGH(); delay_ms(50);
+
+    /* Soft reset */
     rc_write(MFRC522_REG_COMMAND, MFRC522_CMD_SOFT_RESET);
-    HAL_Delay(50);
-}
+    delay_ms(50);
 
-void RC522_Init(SPI_HandleTypeDef *hspi, GPIO_TypeDef *ss_port, uint16_t ss_pin,
-                GPIO_TypeDef *rst_port, uint16_t rst_pin) {
-    rc_hspi = hspi;
-    rc_ss_port = ss_port;  rc_ss_pin = ss_pin;
-    rc_rst_port = rst_port; rc_rst_pin = rst_pin;
-    CS_HIGH();
-
-    rc_reset();
-
-    /* Timer: TPrescaler*TreloadVal/6.78MHz = 24ms */
+    /* Timer: ~24 ms */
     rc_write(MFRC522_REG_T_MODE,      0x8D);
     rc_write(MFRC522_REG_T_PRESCALER, 0x3E);
     rc_write(MFRC522_REG_T_RELOAD_L,  30);
     rc_write(MFRC522_REG_T_RELOAD_H,  0);
 
-    rc_write(MFRC522_REG_TX_AUTO, 0x40);   /* 100% ASK modulation */
+    rc_write(MFRC522_REG_TX_AUTO, 0x40);   /* 100% ASK */
     rc_write(MFRC522_REG_MODE,    0x3D);   /* CRC preset 0x6363 */
 
     rc_antenna_on();
 
     uint8_t v = rc_read(MFRC522_REG_VERSION);
     DBG("RC522 Version: 0x%02X", v);
-    if (v == 0x00 || v == 0xFF) {
-        DBGE("RC522 not responding. Check SPI wiring / power / RST.");
-    }
+    if (v == 0x00 || v == 0xFF)
+        DBGE("RC522 not responding. Check wiring / 3.3V / RST.");
 }
 
 uint8_t RC522_Version(void) { return rc_read(MFRC522_REG_VERSION); }
@@ -103,12 +96,12 @@ static uint8_t rc_to_card(uint8_t cmd, uint8_t *send, uint8_t send_len,
     if (n & irq_en & 0x01) status = MI_NOTAGERR;
 
     if (cmd == MFRC522_CMD_TRANSCEIVE) {
-        n = rc_read(MFRC522_REG_FIFO_LEVEL);
+        n         = rc_read(MFRC522_REG_FIFO_LEVEL);
         last_bits = rc_read(MFRC522_REG_CONTROL) & 0x07;
         if (last_bits) *back_len = (n - 1) * 8 + last_bits;
         else           *back_len = n * 8;
-        if (n == 0)   n = 1;
-        if (n > 16)   n = 16;
+        if (n == 0)  n = 1;
+        if (n > 16)  n = 16;
         for (i = 0; i < n; i++) back[i] = rc_read(MFRC522_REG_FIFO_DATA);
     }
     return status;
@@ -133,10 +126,7 @@ uint8_t RC522_Anticoll(uint8_t *serial) {
     if (status != MI_OK) return status;
 
     for (int i = 0; i < 4; i++) chk ^= serial[i];
-    if (chk != serial[4]) {
-        DBGE("UID BCC mismatch");
-        return MI_ERR;
-    }
+    if (chk != serial[4]) { DBGE("UID BCC mismatch"); return MI_ERR; }
     return MI_OK;
 }
 
