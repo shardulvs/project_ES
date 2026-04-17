@@ -373,7 +373,7 @@ program cycle in #raw("storage.c") and is called out as a future-work item.
 
 == Keil uVision Setup
 
-The project targets the #raw("STM32F429ZITx") device. Under the Manage
+The project targets the #raw("STM32F429I") device. Under the Manage
 Run-Time Environment dialog we enable CMSIS Core, Device Startup, and the
 STM32Cube HAL driver modules for Common, Cortex, GPIO, RCC, PWR, SPI, and
 I#super[2]C. The preprocessor symbols #raw("STM32F429xx") and
