@@ -1,0 +1,28 @@
+# Build / PDF outputs
+*.pdf
+
+# Keil uVision build artefacts
+Objects/
+Listings/
+*.uvguix.*
+*.uvoptx.bak
+*.map
+*.hex
+*.bin
+*.o
+*.d
+*.axf
+*.crf
+*.htm
+*.lnp
+*.iex
+*.l1p
+*.l2p
+*.dep
+*.scvd
+
+# Editor / OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(typst --version)",
+      "Bash(typst compile *)",
+      "Bash(git check-ignore *)",
+      "Bash(python3 *)"
+    ]
+  }
+}

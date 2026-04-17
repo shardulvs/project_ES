@@ -1,4 +1,4 @@
-# Secure Door Lock — STM32F429I-DISC1 (Keil uVision)
+# Secure Door Lock - STM32F429I-DISC1 (Keil uVision)
 
 ## Files
 
@@ -11,7 +11,7 @@ Src/
 
 ## Creating the Keil project (quickest path)
 
-1. **File → New → uVision Project…**, pick device **STM32F429ZITx** (Discovery has ZI).
+1. **File → New → uVision Project...**, pick device **STM32F429ZITx** (Discovery has ZI).
 2. In the Manage Run-Time Environment dialog, tick:
    - **CMSIS → CORE**
    - **Device → Startup**
@@ -60,7 +60,7 @@ Note: only one green + one red LED are used in firmware. If you want all five of
 ```
 
 In PIN entry:
-- digits 0–9 enter the PIN (masked as `*`)
+- digits 0-9 enter the PIN (masked as `*`)
 - `#` submits
 - `*` is backspace
 - `D` cancels
@@ -74,19 +74,19 @@ Admin menu keys: `A`=enroll card, `B`=delete card, `C`=change master PIN, `D`=ex
 ## Defaults (see `Src/storage.c`)
 
 - Master PIN: `9999`
-- Duress PIN: `0000` (grants entry, silently flags an alarm — change for real use)
+- Duress PIN: `0000` (grants entry, silently flags an alarm - change for real use)
 - Per-card PIN: `1234` (set on enroll; edit `storage.c` to customise)
 - One demo card with UID `DE AD BE EF` is pre-enrolled for testing the flow before you scan a real card.
 
 ## LCD I²C address
 
 Most PCF8574 backpacks are at `0x27`; some are `0x3F`. If the screen is blank after boot:
-1. Watch the debug printout — we probe the address on init.
+1. Watch the debug printout - we probe the address on init.
 2. If not found, change `LCD_I2C_ADDR` in `Inc/lcd_i2c.h`.
 
 ## Flow summary
 
-1. Idle: red LED on, LCD shows "Scan card…".
+1. Idle: red LED on, LCD shows "Scan card...".
 2. Scan known card → LCD prompts for PIN → enter 4 digits + `#`.
 3. Correct PIN ⇒ green LED + 2-tone beep + 5 s unlock window with countdown.
 4. Wrong PIN / unknown card / bad master ⇒ red blink + low tone; 3 fails in a row ⇒ 30 s lockout with on-screen countdown + rapid beep.

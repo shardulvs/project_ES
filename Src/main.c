@@ -1,5 +1,5 @@
 /* ============================================================================
- *  Secure Door Lock System — STM32F429I-DISC1
+ *  Secure Door Lock System - STM32F429I-DISC1
  *  Features: RFID (RC522) + PIN keypad, tamper button, lockout, admin menu,
  *            duress PIN, LEDs, buzzer, I2C LCD, ITM SWO debug prints.
  *
@@ -65,7 +65,7 @@ static uint8_t       g_fail_count = 0;
 static uint32_t      g_lockout_until = 0;
 static uint8_t       g_last_uid[UID_LEN];
 static int           g_last_slot = -1;
-volatile uint8_t     g_tamper_flag = 0;     /* set in EXTI ISR — see stm32f4xx_it.c */
+volatile uint8_t     g_tamper_flag = 0;     /* set in EXTI ISR - see stm32f4xx_it.c */
 
 #define MAX_FAILS       3
 #define LOCKOUT_MS      30000UL
@@ -120,14 +120,14 @@ static void MX_GPIO_Init(void) {
 
     GPIO_InitTypeDef g = {0};
 
-    /* Buzzer / LEDs — push-pull output */
+    /* Buzzer / LEDs - push-pull output */
     g.Mode = GPIO_MODE_OUTPUT_PP; g.Pull = GPIO_NOPULL; g.Speed = GPIO_SPEED_FREQ_LOW;
 
     g.Pin = PIN_BUZZER; HAL_GPIO_Init(PIN_BUZZER_PORT, &g); HAL_GPIO_WritePin(PIN_BUZZER_PORT, PIN_BUZZER, 0);
     g.Pin = PIN_GREEN;  HAL_GPIO_Init(PIN_GREEN_PORT,  &g); HAL_GPIO_WritePin(PIN_GREEN_PORT,  PIN_GREEN,  0);
     g.Pin = PIN_RED;    HAL_GPIO_Init(PIN_RED_PORT,    &g); HAL_GPIO_WritePin(PIN_RED_PORT,    PIN_RED,    0);
 
-    /* RFID RST + SS — push-pull output, idle HIGH */
+    /* RFID RST + SS - push-pull output, idle HIGH */
     g.Pin = PIN_RFID_RST; HAL_GPIO_Init(PIN_RFID_RST_PORT, &g); HAL_GPIO_WritePin(PIN_RFID_RST_PORT, PIN_RFID_RST, 1);
     g.Pin = PIN_RFID_SS;  HAL_GPIO_Init(PIN_RFID_SS_PORT,  &g); HAL_GPIO_WritePin(PIN_RFID_SS_PORT,  PIN_RFID_SS,  1);
 
@@ -160,7 +160,7 @@ static void MX_SPI1_Init(void) {
     hspi1.Init.CLKPolarity       = SPI_POLARITY_LOW;
     hspi1.Init.CLKPhase          = SPI_PHASE_1EDGE;
     hspi1.Init.NSS               = SPI_NSS_SOFT;
-    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;  /* ~2.8 MHz — safe for RC522 */
+    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;  /* ~2.8 MHz - safe for RC522 */
     hspi1.Init.FirstBit          = SPI_FIRSTBIT_MSB;
     hspi1.Init.TIMode            = SPI_TIMODE_DISABLE;
     hspi1.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
@@ -190,7 +190,7 @@ static void MX_I2C1_Init(void) {
     if (HAL_I2C_Init(&hi2c1) != HAL_OK) DBGE("I2C1 init failed");
 }
 
-/* EXTI0 ISR callback — tamper button.
+/* EXTI0 ISR callback - tamper button.
  * The ISR entry (EXTI0_IRQHandler) and core handlers live in Src/stm32f4xx_it.c
  * so this file doesn't collide with a CubeMX-generated one. */
 extern volatile uint8_t g_tamper_flag;
